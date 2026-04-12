@@ -20,7 +20,7 @@ REDIS_DSN     = "rediss://default:gQAAAAAAASdZAAIncDEzNTUxN2NmY2U2ZDQ0Y2Y1YTExMD
 FSM_TTL_SEC   = 1800   # 30 минут — после этого незавершённая сессия сбрасывается
 
 # ── Webhook ───────────────────────────────────────────────────────────────────
-WEBHOOK_BASE_URL  = "https://your-domain.com"   # публичный домен
+WEBHOOK_BASE_URL  = "https://bot-1775993557-9173-skammm.bothost.tech"   # публичный домен
 WEBHOOK_BOT_PATH  = "/bot/webhook"              # путь для Telegram
 WEBHOOK_HOST      = "0.0.0.0"
 WEBHOOK_PORT      = 8443                        # порт, который слушает aiohttp
