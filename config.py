@@ -13,10 +13,10 @@ OWNER_USERNAME   = "vorache777"
 SUPPORT_USERNAME = "notwork3r"
 
 # ── PostgreSQL ───────────────────────────────────────────────────────────────
-DB_DSN = "postgresql://user:password@localhost:5432/shopbot"
+DB_DSN = "postgresql://bothost_db_09746dfc4bf1:kIpfoZ78hiUYSyFURMENiB7XPfwVJL68vX60XwsykPA@node1.pghost.ru:15558/bothost_db_09746dfc4bf1"
 
 # ── Redis (FSM storage + TTL сессий) ─────────────────────────────────────────
-REDIS_DSN     = "redis://localhost:6379/0"
+REDIS_DSN     = "rediss://default:gQAAAAAAASdZAAIncDEzNTUxN2NmY2U2ZDQ0Y2Y1YTExMDdjMzYzMDJiZGUxNXAxNzU2MDk@present-adder-75609.upstash.io:6379"
 FSM_TTL_SEC   = 1800   # 30 минут — после этого незавершённая сессия сбрасывается
 
 # ── Webhook ───────────────────────────────────────────────────────────────────
