@@ -1,19 +1,12 @@
 from aiogram.types import (
-    ReplyKeyboardMarkup, KeyboardButton,
     InlineKeyboardMarkup, InlineKeyboardButton,
 )
 from config import REVIEW_CHANNEL, OWNER_USERNAME, SUPPORT_USERNAME, CATALOG_PAGE_SIZE
 
 
-def main_kb() -> ReplyKeyboardMarkup:
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="🛒 Товары"),    KeyboardButton(text="💰 Баланс")],
-            [KeyboardButton(text="👤 Профиль"),   KeyboardButton(text="📋 Наличие")],
-            [KeyboardButton(text="⭐ Репутация"), KeyboardButton(text="🆘 Поддержка")],
-        ],
-        resize_keyboard=True,
-    )
+def main_kb():
+    """Убрана reply-клавиатура — используем только inline."""
+    return None
 
 
 def welcome_inline_kb() -> InlineKeyboardMarkup:
@@ -22,6 +15,7 @@ def welcome_inline_kb() -> InlineKeyboardMarkup:
          InlineKeyboardButton(text="📋 Наличие",          callback_data="stock_root")],
         [InlineKeyboardButton(text="💰 Пополнить баланс", callback_data="topup_menu"),
          InlineKeyboardButton(text="👤 Профиль",          callback_data="profile_inline")],
+        [InlineKeyboardButton(text="⭐ Репутация",        callback_data="reputation_inline")],
         [InlineKeyboardButton(text="🆘 Поддержка",
                               url=f"https://t.me/{SUPPORT_USERNAME}")],
     ])
@@ -55,9 +49,6 @@ def categories_kb(categories: list, back_data: str | None = None) -> InlineKeybo
 def products_kb(products: list, total: int, cat_id: int,
                 parent_cat_id: int | None, offset: int = 0,
                 back_to_stock: bool = False) -> InlineKeyboardMarkup:
-    """
-    Каталог с пагинацией: максимум CATALOG_PAGE_SIZE товаров на страницу.
-    """
     rows = []
     for p in products:
         label = f"🛍 {p['name']} | {float(p['price']):.2f}$"
@@ -65,7 +56,6 @@ def products_kb(products: list, total: int, cat_id: int,
             label += f" | {p['stock']} шт."
         rows.append([InlineKeyboardButton(label, callback_data=f"prod_{p['id']}")])
 
-    # Навигация по страницам
     nav = []
     if offset > 0:
         prev_off = max(0, offset - CATALOG_PAGE_SIZE)
@@ -83,7 +73,6 @@ def products_kb(products: list, total: int, cat_id: int,
     if len(nav) > 1:
         rows.append(nav)
 
-    # Кнопка назад
     if back_to_stock:
         rows.append([InlineKeyboardButton(text="◀️ К наличию", callback_data="stock_root")])
     elif parent_cat_id is not None:
@@ -115,10 +104,9 @@ def product_detail_kb(product_id: int, cat_id: int,
 
 
 def balance_kb() -> InlineKeyboardMarkup:
+    """Только CryptoBot — Stars и FreeKassa убраны."""
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="💳 CryptoBot (USDT) +3%", callback_data="topup_crypto")],
-        [InlineKeyboardButton(text="⭐ Telegram Stars",        callback_data="topup_stars")],
-        [InlineKeyboardButton(text="🏦 FreeKassa (₽)",        callback_data="topup_fk")],
     ])
 
 
