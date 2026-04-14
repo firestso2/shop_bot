@@ -1,11 +1,10 @@
 """
 Точка входа.
-- Webhook mode (не polling) для минимальной задержки
+- Webhook mode для минимальной задержки
 - Redis FSM Storage с TTL
 - PostgreSQL pool
 - APScheduler для фоновых задач
 """
-import asyncio
 import logging
 import logging.handlers
 from aiohttp import web
@@ -19,7 +18,6 @@ from config import (
     BOT_TOKEN, WEBHOOK_BASE_URL, WEBHOOK_BOT_PATH,
     WEBHOOK_HOST, WEBHOOK_PORT,
     REDIS_DSN, FSM_TTL_SEC, LOG_FILE,
-    FREEKASSA_WEBHOOK_PATH,
 )
 from db.pool import init_pool, close_pool
 from db.migrations import run_migrations
@@ -29,7 +27,6 @@ from handlers.shop import router as shop_router
 from handlers.balance import router as balance_router
 from handlers.admin import router as admin_router
 from handlers.p2p import router as p2p_router
-from handlers.freekassa_webhook import create_fk_app
 from services.scheduler import setup_scheduler
 
 
@@ -67,7 +64,6 @@ async def on_shutdown(bot: Bot) -> None:
 def main() -> None:
     setup_logging()
 
-    # ── Redis FSM storage с TTL ────────────────────────────────────────────
     storage = RedisStorage.from_url(
         REDIS_DSN,
         key_builder=DefaultKeyBuilder(with_bot_id=True, with_destiny=True),
@@ -81,37 +77,25 @@ def main() -> None:
     )
     dp = Dispatcher(storage=storage)
 
-    # Хуки
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
 
     # Роутеры — порядок важен!
     dp.include_router(start_router)
-    dp.include_router(p2p_router)    # P2P перехват ПЕРЕД shop (shop имеет общий текст)
+    dp.include_router(p2p_router)
     dp.include_router(shop_router)
     dp.include_router(balance_router)
     dp.include_router(admin_router)
 
-    # ── aiohttp приложение ─────────────────────────────────────────────────
     app = web.Application()
-
-    # Telegram webhook
     SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_BOT_PATH)
     setup_application(app, dp, bot=bot)
 
-    # FreeKassa webhook
-    from handlers.freekassa_webhook import create_fk_app
-    fk_app = create_fk_app(bot)
-    app.add_subapp(FREEKASSA_WEBHOOK_PATH, fk_app)  # монтируем как sub-app
-
-    # ── PostgreSQL ─────────────────────────────────────────────────────────
     async def _on_startup_pg(app):
         await init_pool()
         pool = get_pool()
         await run_migrations(pool)
         log.info("Database ready.")
-
-        # Scheduler стартует здесь, когда event loop уже запущен
         scheduler = setup_scheduler(bot)
         scheduler.start()
         app["scheduler"] = scheduler
