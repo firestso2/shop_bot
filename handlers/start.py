@@ -1,11 +1,11 @@
-from aiogram import Router, F, Bot
+fromfrom aiogram import Router, F, Bot
 from aiogram.filters import CommandStart
 from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 
 from config import OP_CHANNEL
 from db.database import ensure_user, get_user, set_subscribed, log_action
-from keyboards.user_kb import main_kb, op_check_kb, welcome_inline_kb
+from keyboards.user_kb import welcome_inline_kb, op_check_kb
 
 router = Router()
 
@@ -20,11 +20,7 @@ async def _is_subscribed(bot: Bot, user_id: int) -> bool:
 
 async def _send_welcome(target: Message) -> None:
     await target.answer(
-        "👋 <b>Добро пожаловать в магазин!</b>",
-        reply_markup=main_kb(),
-    )
-    await target.answer(
-        "🔽 <b>Быстрый доступ:</b>",
+        "👋 <b>Добро пожаловать в магазин!</b>\n\n🔽 <b>Быстрый доступ:</b>",
         reply_markup=welcome_inline_kb(),
     )
 
@@ -119,3 +115,4 @@ async def profile_inline(call: CallbackQuery, bot: Bot):
     from handlers.balance import send_profile
     await send_profile(call.message, call.from_user, bot)
     await call.answer()
+
