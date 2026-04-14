@@ -1,17 +1,15 @@
 """
-Профиль, баланс, пополнение (CryptoBot / Stars / FreeKassa).
-Курсы валют берутся строго из config.py — никаких внешних API.
+Профиль, баланс, пополнение (только CryptoBot).
 """
 import uuid
 from aiogram import Router, F, Bot
-from aiogram.types import Message, CallbackQuery, User, LabeledPrice
+from aiogram.types import Message, CallbackQuery, User
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
 from config import (
     MIN_TOPUP, REFERRAL_PERCENT, ADMIN_IDS,
     OWNER_USERNAME, SUPPORT_USERNAME, REVIEW_CHANNEL,
-    FREEKASSA_RATE_RUB_PER_USD, STARS_USD_PER_STAR,
 )
 from db.database import (
     get_user, add_balance, get_referrer_id, add_ref_earned,
@@ -19,13 +17,10 @@ from db.database import (
     get_user_orders, get_orders_count,
 )
 from keyboards.user_kb import (
-    main_kb, balance_kb, topup_go_kb, cancel_kb,
+    balance_kb, topup_go_kb, cancel_kb,
     support_kb, reputation_kb, orders_nav_kb,
 )
-from utils.payments import (
-    cryptobot_create_invoice, cryptobot_get_invoice,
-    freekassa_generate_url,
-)
+from utils.payments import cryptobot_create_invoice, cryptobot_get_invoice
 
 router = Router()
 
@@ -34,8 +29,6 @@ ORDERS_PAGE_SIZE = 5
 
 class TopupState(StatesGroup):
     amount_crypto = State()
-    amount_fk     = State()
-    amount_stars  = State()
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -126,10 +119,7 @@ async def balance_menu(message: Message):
     bal  = float(user["balance"]) if user else 0.0
     await message.answer(
         f"💰 <b>Баланс: {bal:.2f} $</b>\n\n"
-        f"Минимум: {MIN_TOPUP} $\n\n"
-        f"💱 Курсы:\n"
-        f"  • FreeKassa: {FREEKASSA_RATE_RUB_PER_USD:.0f} ₽ = 1 $\n"
-        f"  • Stars: {STARS_USD_PER_STAR} $ за 1 ⭐\n\n"
+        f"Минимум пополнения: {MIN_TOPUP} $\n\n"
         f"<i>Пополнение в ₽ напрямую — через @{OWNER_USERNAME}</i>",
         parse_mode="HTML",
         reply_markup=balance_kb(),
@@ -232,127 +222,6 @@ async def cryptobot_check_manual(call: CallbackQuery, bot: Bot):
 
 
 # ════════════════════════════════════════════════════════════════════════════
-#  FREEKASSA
-# ════════════════════════════════════════════════════════════════════════════
-
-@router.callback_query(F.data == "topup_fk")
-async def topup_fk_start(call: CallbackQuery, state: FSMContext):
-    await call.message.answer(
-        f"🏦 <b>FreeKassa (₽)</b>\n\n"
-        f"Введите сумму в рублях (мин. 80 ₽).\n"
-        f"<i>Курс: {FREEKASSA_RATE_RUB_PER_USD:.0f} ₽ = 1 $</i>",
-        parse_mode="HTML",
-        reply_markup=cancel_kb(),
-    )
-    await state.set_state(TopupState.amount_fk)
-    await call.answer()
-
-
-@router.message(TopupState.amount_fk)
-async def topup_fk_amount(message: Message, state: FSMContext):
-    try:
-        amount_rub = round(float(message.text.replace(",", ".")), 2)
-        if amount_rub < 80:
-            raise ValueError
-    except ValueError:
-        await message.answer("❌ Введите сумму от 80 ₽!")
-        return
-
-    amount_usd = round(amount_rub / FREEKASSA_RATE_RUB_PER_USD, 4)
-    order_id   = f"fk_{message.from_user.id}_{uuid.uuid4().hex[:8]}"
-
-    await create_payment(message.from_user.id, amount_rub, amount_usd,
-                         "freekassa", order_id)
-    await log_action(message.from_user.id, "topup_initiated",
-                     {"method": "freekassa", "rub": amount_rub, "usd": amount_usd})
-    await state.clear()
-
-    pay_url = freekassa_generate_url(order_id, amount_rub)
-    await message.answer(
-        f"🏦 К оплате: <b>{amount_rub} ₽</b>\n"
-        f"✅ Будет зачислено: ≈<b>{amount_usd:.2f} $</b>",
-        parse_mode="HTML",
-        reply_markup=topup_go_kb(pay_url=pay_url, check_data="fk_manual_check"),
-    )
-
-
-@router.callback_query(F.data == "fk_manual_check")
-async def fk_manual_check(call: CallbackQuery):
-    await call.answer(
-        "⏳ FK зачисляет автоматически. Если > 5 мин — напишите в поддержку.",
-        show_alert=True,
-    )
-
-
-# ════════════════════════════════════════════════════════════════════════════
-#  TELEGRAM STARS
-# ════════════════════════════════════════════════════════════════════════════
-
-@router.callback_query(F.data == "topup_stars")
-async def topup_stars_start(call: CallbackQuery, state: FSMContext):
-    await call.message.answer(
-        f"⭐ <b>Telegram Stars</b>\n\n"
-        f"Введите сумму в $ (мин. 1 $).\n"
-        f"<i>Курс: {STARS_USD_PER_STAR} $ за 1 ⭐</i>",
-        parse_mode="HTML",
-        reply_markup=cancel_kb(),
-    )
-    await state.set_state(TopupState.amount_stars)
-    await call.answer()
-
-
-@router.message(TopupState.amount_stars)
-async def topup_stars_amount(message: Message, state: FSMContext):
-    try:
-        amount_usd = round(float(message.text.replace(",", ".")), 2)
-        if amount_usd < 1.0:
-            raise ValueError
-    except ValueError:
-        await message.answer("❌ Введите сумму от 1 $!")
-        return
-
-    stars_count = max(1, round(amount_usd / STARS_USD_PER_STAR))
-    await state.clear()
-
-    await message.answer_invoice(
-        title="Пополнение баланса",
-        description=f"Пополнение на {amount_usd:.2f} $",
-        payload=f"topup_{message.from_user.id}_{int(amount_usd * 100)}",
-        currency="XTR",
-        prices=[LabeledPrice(label="Пополнение", amount=stars_count)],
-    )
-
-
-@router.message(
-    F.successful_payment &
-    F.successful_payment.invoice_payload.startswith("topup_")
-)
-async def stars_topup_done(message: Message, bot: Bot):
-    payload    = message.successful_payment.invoice_payload
-    parts      = payload.split("_")
-    user_id    = int(parts[1])
-    amount_usd = int(parts[2]) / 100
-
-    new_bal = await add_balance(user_id, amount_usd)
-    await _pay_ref_bonus(bot, user_id, amount_usd)
-    await log_action(user_id, "topup_paid",
-                     {"method": "stars", "credited": amount_usd})
-
-    await message.answer(
-        f"✅ <b>Баланс пополнен (Stars)!</b>\n+{amount_usd} $\n"
-        f"Баланс: <b>{new_bal:.2f} $</b>",
-        parse_mode="HTML",
-    )
-    for aid in ADMIN_IDS:
-        try:
-            await bot.send_message(
-                aid, f"⭐ Stars пополнение\nID: {user_id}\n+{amount_usd} $"
-            )
-        except Exception:
-            pass
-
-
-# ════════════════════════════════════════════════════════════════════════════
 #  ПОДДЕРЖКА / РЕПУТАЦИЯ
 # ════════════════════════════════════════════════════════════════════════════
 
@@ -377,6 +246,17 @@ async def reputation(message: Message):
         parse_mode="HTML",
         reply_markup=reputation_kb(),
     )
+
+
+@router.callback_query(F.data == "reputation_inline")
+async def reputation_inline(call: CallbackQuery):
+    await call.message.answer(
+        f"⭐ <b>Репутация</b>\n\nОтзывы в {REVIEW_CHANNEL}.\n"
+        f"Оставьте отзыв — получите купон на скидку!",
+        parse_mode="HTML",
+        reply_markup=reputation_kb(),
+    )
+    await call.answer()
 
 
 # ════════════════════════════════════════════════════════════════════════════
