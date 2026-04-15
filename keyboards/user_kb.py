@@ -1,4 +1,4 @@
-from aiogram.types import (
+fromfrom aiogram.types import (
     InlineKeyboardMarkup, InlineKeyboardButton,
 )
 from config import REVIEW_CHANNEL, OWNER_USERNAME, SUPPORT_USERNAME, CATALOG_PAGE_SIZE
